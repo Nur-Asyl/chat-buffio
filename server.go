@@ -139,8 +139,13 @@ func (room *Room) handleClient(client *Client, cs *ChatServer) {
 	fmt.Printf("%s has disconnected\n", client.name)
 }
 
+const (
+	CONN_PORT = ":3334"
+	CONN_TYPE = "tcp"
+)
+
 func main() {
-	listener, err := net.Listen("tcp", ":3334")
+	listener, err := net.Listen(CONN_TYPE, CONN_PORT)
 	if err != nil {
 		fmt.Println("Error listening:", err.Error())
 		return

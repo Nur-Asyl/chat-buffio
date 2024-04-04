@@ -7,8 +7,13 @@ import (
 	"os"
 )
 
+const (
+	CONN_PORT_CLIENT = ":3334"
+	CONN_TYPE_CLIENT = "tcp"
+)
+
 func main() {
-	conn, err := net.Dial("tcp", "localhost:3334")
+	conn, err := net.Dial(CONN_TYPE_CLIENT, CONN_PORT_CLIENT)
 	if err != nil {
 		fmt.Println("Error connecting:", err.Error())
 		return
