@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"net"
+	"os"
 	"strings"
 	"time"
 )
@@ -17,8 +18,10 @@ type Client struct {
 }
 
 type Room struct {
-	name    string
-	clients map[net.Conn]*Client
+	name      string
+	clients   map[net.Conn]*Client
+	logFile   *os.File
+	logWriter *bufio.Writer
 }
 
 type ChatServer struct {
@@ -30,13 +33,37 @@ func NewChatServer() *ChatServer {
 }
 
 func (cs *ChatServer) createRoom(name string) *Room {
-	room := &Room{name: name, clients: make(map[net.Conn]*Client)}
+	room := &Room{
+		name:    name,
+		clients: make(map[net.Conn]*Client),
+	}
+	room.createLogFile()
 	cs.rooms[name] = room
 	return room
 }
 
 func (cs *ChatServer) getRoom(name string) *Room {
 	return cs.rooms[name]
+}
+
+func (room *Room) createLogFile() {
+	fileName := room.name + "_log.txt"
+	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Println("Error opening log file:", err)
+		return
+	}
+	room.logFile = file
+	room.logWriter = bufio.NewWriter(file)
+}
+
+func (room *Room) logMessage(client *Client, message string) {
+	if room.logWriter == nil {
+		return
+	}
+	now := time.Now().Format("2006-01-02 15:04:05")
+	room.logWriter.WriteString(fmt.Sprintf("[%s] %s: %s\n", now, client.name, message))
+	room.logWriter.Flush()
 }
 
 func (room *Room) broadcast(sender *Client, message string) {
@@ -46,33 +73,23 @@ func (room *Room) broadcast(sender *Client, message string) {
 			client.writer.Flush()
 		}
 	}
+	room.logMessage(sender, message)
 }
+
 func (room *Room) join(client *Client) {
 	client.room = room
 	room.clients[client.conn] = client
 	client.writer.WriteString("Joined room: " + room.name + "\n")
 	client.writer.Flush()
-
-	for _, c := range room.clients {
-		if c != client {
-			c.writer.WriteString(client.name + " has joined the room.\n")
-			c.writer.Flush()
-		}
-	}
 }
 
 func (room *Room) leave(client *Client) {
-	for _, c := range room.clients {
-		if c != client {
-			c.writer.WriteString(client.name + " has left the room.\n")
-			c.writer.Flush()
-		}
-	}
 	delete(room.clients, client.conn)
 	client.room = nil
 	client.writer.WriteString("Left room: " + room.name + "\n")
 	client.writer.Flush()
 }
+
 func (room *Room) handleClient(client *Client, cs *ChatServer) {
 	defer client.conn.Close()
 	fmt.Printf("New client connected: %s\n", client.conn.RemoteAddr().String())
@@ -83,8 +100,8 @@ func (room *Room) handleClient(client *Client, cs *ChatServer) {
 	client.name, _ = client.reader.ReadString('\n')
 	client.name = strings.TrimSpace(client.name)
 
-	client.writer.WriteString("Welcome, " + client.name + "!\n")
-	client.writer.WriteString("Use the /help command to see available commands!!!!! \\'0'/\n")
+	client.writer.WriteString("Welcome!!! " + client.name + "!\n")
+	client.writer.WriteString("Use the /help command to see available commands!!! \\'0'/ \n")
 	client.writer.Flush()
 
 	for {
@@ -118,7 +135,7 @@ func (room *Room) handleClient(client *Client, cs *ChatServer) {
 			break
 		} else if message == "/help" {
 			client.writer.WriteString("Available commands:\n")
-			client.writer.WriteString("/create [room_name] - Create new room.\n")
+			client.writer.WriteString("/create [room_name] - Create a new room.\n")
 			client.writer.WriteString("/join [room_name] - Join an existing room.\n")
 			client.writer.WriteString("/exit - Exit the chat.\n")
 			client.writer.Flush()
@@ -127,7 +144,7 @@ func (room *Room) handleClient(client *Client, cs *ChatServer) {
 				now := time.Now().Format("2006-01-02 15:04:05")
 				room.broadcast(client, "["+now+"] "+message)
 			} else {
-				client.writer.WriteString("You are not in a room. Use /join to enter room.\n")
+				client.writer.WriteString("You are not in room. Use /join to enter room.\n")
 				client.writer.Flush()
 			}
 		}
@@ -139,24 +156,17 @@ func (room *Room) handleClient(client *Client, cs *ChatServer) {
 	fmt.Printf("%s has disconnected\n", client.name)
 }
 
-const (
-	CONN_PORT = ":3334"
-	CONN_TYPE = "tcp"
-)
-
 func main() {
-	listener, err := net.Listen(CONN_TYPE, CONN_PORT)
+	listener, err := net.Listen("tcp", ":3334")
 	if err != nil {
 		fmt.Println("Error listening:", err.Error())
 		return
 	}
 	defer listener.Close()
 
-	fmt.Println("Chat server started on portt 3334")
+	fmt.Println("Chat server started on port 3334")
 
 	chatServer := NewChatServer()
-
-	defaultRoom := chatServer.createRoom("default")
 
 	for {
 		conn, err := listener.Accept()
@@ -171,6 +181,6 @@ func main() {
 			writer: bufio.NewWriter(conn),
 		}
 
-		go defaultRoom.handleClient(client, chatServer)
+		go chatServer.createRoom("default").handleClient(client, chatServer)
 	}
 }
