@@ -23,3 +23,16 @@ func Test_Room_CreateRoom(t *testing.T) {
 	delete(cs.Rooms, roomName)
 	os.Remove(room.name + "_log.txt")
 }
+
+func Test_Room_GetRoom(t *testing.T) {
+	// Arrange
+	cs := NewChatServer()
+	roomName := "testRoom"
+	room := cs.CreateRoom(roomName)
+
+	// Act
+	retrievedRoom := cs.GetRoom(roomName)
+
+	// Assert
+	assert.Equal(t, room, retrievedRoom, "Expected to get room '%s', got different room", roomName)
+}

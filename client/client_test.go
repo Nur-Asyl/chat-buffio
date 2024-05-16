@@ -1,34 +1,55 @@
 package main
 
 import (
-	"ex1/internal"
+	"bufio"
+	"fmt"
+	"net"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
-func TestCreateRoom(t *testing.T) {
-	// Arrange
-	cs := internal.NewChatServer()
-	roomName := "testRoom"
+const (
+	CONN_TEST_PORT_CLIENT = ":3334"
+	CONN_TEST_TYPE_CLIENT = "tcp"
+)
 
-	// Act
-	room := cs.CreateRoom(roomName)
-
-	// Assert
-	assert.NotNil(t, room, "Expected a non-nil Room instance, got nil")
-	assert.Contains(t, cs.Rooms, roomName, "Expected room '%s' to be created, but it's not in the map", roomName)
+func Test_Client_MainConnection(t *testing.T) {
+	t.Parallel()
+	conn, err := net.Dial(CONN_TEST_TYPE_CLIENT, CONN_TEST_PORT_CLIENT)
+	if err != nil {
+		t.Skipf("Skipping test: unable to connect to %s: %s", CONN_PORT_CLIENT, err.Error())
+		return
+	}
+	defer conn.Close()
 }
 
-func TestGetRoom(t *testing.T) {
-	// Arrange
-	cs := internal.NewChatServer()
-	roomName := "testRoom"
-	room := cs.CreateRoom(roomName)
+func Test_Client_SendMessage(t *testing.T) {
+	t.Parallel()
+	conn, err := net.Dial(CONN_TYPE_CLIENT, CONN_PORT_CLIENT)
+	if err != nil {
+		t.Skipf("Skipping test: unable to connect to %s: %s", CONN_PORT_CLIENT, err.Error())
+		return
+	}
+	defer conn.Close()
 
-	// Act
-	retrievedRoom := cs.GetRoom(roomName)
+	writer := bufio.NewWriter(conn)
+	writer.WriteString("Test message\n")
+	writer.Flush()
+}
 
-	// Assert
-	assert.Equal(t, room, retrievedRoom, "Expected to get room '%s', got different room", roomName)
+func Test_Client_ReceiveMessage(t *testing.T) {
+	t.Parallel()
+	conn, err := net.Dial(CONN_TYPE_CLIENT, CONN_PORT_CLIENT)
+	if err != nil {
+		t.Skipf("Skipping test: unable to connect to %s: %s", CONN_PORT_CLIENT, err.Error())
+		return
+	}
+	defer conn.Close()
+
+	reader := bufio.NewReader(conn)
+	message, err := reader.ReadString('\n')
+	if err != nil {
+		t.Errorf("Error reading message: %s", err.Error())
+		return
+	}
+	fmt.Println("Received message:", message)
 }
