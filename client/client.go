@@ -24,6 +24,7 @@ func main() {
 	writer := bufio.NewWriter(conn)
 
 	fmt.Print("Enter your name: ")
+	writer.Flush()
 	name, _ := reader.ReadString('\n')
 	name = name[:len(name)-1]
 
